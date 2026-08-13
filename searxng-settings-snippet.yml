@@ -1,0 +1,7 @@
+# Merge this into your SearXNG settings.yml.
+# JSON must be enabled for /search?format=json.
+
+search:
+  formats:
+    - html
+    - json
