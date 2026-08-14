@@ -34,7 +34,7 @@ ezwebsearch-api = "api:main"
 
 [tool.setuptools]
 packages = ["ezwebsearch"]
-py-modules = ["api", "cli", "config", "local_searxng", "runtime", "search_service"]
+py-modules = ["api", "cli", "config", "search_service"]
 
 [tool.setuptools.exclude-package-data]
 "*" = ["__pycache__/*", "*.py[cod]"]

@@ -7,8 +7,6 @@ import sys
 from pathlib import Path
 
 from config import Settings
-from local_searxng import LocalSearXNG
-from runtime import SearchRuntime
 from search_service import SearchService
 
 
@@ -53,8 +51,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--searxng-url",
         default=Settings.from_env().searxng_url,
         help=(
-            "SearXNG base URL. If omitted, provision a temporary local "
-            "SearXNG server automatically (or use SEARXNG_URL)."
+            "SearXNG base URL (default: http://127.0.0.1:6667; "
+            "or use SEARXNG_URL)."
         ),
     )
     parser.add_argument(
@@ -83,13 +81,8 @@ async def run(args: argparse.Namespace) -> int:
         if getattr(args, "searxng_url", None):
             settings.searxng_url = args.searxng_url
 
-        runtime = SearchRuntime(
-            settings,
-            service=SearchService(settings),
-            local_searxng_factory=LocalSearXNG,
-        )
-        async with runtime:
-            result = await runtime.service.search(
+        async with SearchService(settings) as service:
+            result = await service.search(
                 query=query,
                 links=args.links,
                 retries=args.retries,

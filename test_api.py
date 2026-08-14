@@ -9,25 +9,9 @@ from unittest.mock import patch
 import api
 
 
-class FakeLocalSearXNG:
-    instances: list["FakeLocalSearXNG"] = []
-
-    def __init__(self) -> None:
-        self.started = False
-        self.closed = False
-        self.__class__.instances.append(self)
-
-    async def start(self) -> str:
-        self.started = True
-        return "http://127.0.0.1:43210"
-
-    async def close(self) -> None:
-        self.closed = True
-
-
 class FakeSearchService:
     def __init__(self, *, fail_start: bool = False) -> None:
-        self.settings = SimpleNamespace(searxng_url="http://127.0.0.1:8080")
+        self.settings = SimpleNamespace(searxng_url="http://127.0.0.1:6667")
         self.fail_start = fail_start
         self.started = False
         self.closed = False
@@ -42,28 +26,7 @@ class FakeSearchService:
 
 
 class ApiLifecycleTests(unittest.TestCase):
-    def setUp(self) -> None:
-        FakeLocalSearXNG.instances.clear()
-
-    def test_api_starts_and_stops_local_searxng_without_external_url(self) -> None:
-        service = FakeSearchService()
-
-        with (
-            patch.dict(os.environ, {}, clear=True),
-            patch.object(api, "LocalSearXNG", FakeLocalSearXNG),
-            patch.object(api, "service", service),
-        ):
-            asyncio.run(self._run_lifespan())
-
-        self.assertEqual(len(FakeLocalSearXNG.instances), 1)
-        local = FakeLocalSearXNG.instances[0]
-        self.assertTrue(local.started)
-        self.assertTrue(local.closed)
-        self.assertTrue(service.started)
-        self.assertTrue(service.closed)
-        self.assertEqual(service.settings.searxng_url, "http://127.0.0.1:43210")
-
-    def test_api_uses_external_searxng_without_starting_local_instance(self) -> None:
+    def test_api_uses_the_configured_searxng_without_managing_it(self) -> None:
         service = FakeSearchService()
 
         with (
@@ -72,26 +35,35 @@ class ApiLifecycleTests(unittest.TestCase):
                 {"SEARXNG_URL": "http://search.example/"},
                 clear=True,
             ),
-            patch.object(api, "LocalSearXNG", FakeLocalSearXNG),
             patch.object(api, "service", service),
         ):
             asyncio.run(self._run_lifespan())
 
-        self.assertEqual(FakeLocalSearXNG.instances, [])
+        self.assertTrue(service.started)
+        self.assertTrue(service.closed)
         self.assertEqual(service.settings.searxng_url, "http://search.example")
 
-    def test_local_instance_is_closed_if_service_start_fails(self) -> None:
+    def test_api_defaults_to_the_compose_searxng_port(self) -> None:
+        service = FakeSearchService()
+
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch.object(api, "service", service),
+        ):
+            asyncio.run(self._run_lifespan())
+
+        self.assertEqual(service.settings.searxng_url, "http://127.0.0.1:6667")
+
+    def test_service_is_closed_if_start_fails(self) -> None:
         service = FakeSearchService(fail_start=True)
 
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch.object(api, "LocalSearXNG", FakeLocalSearXNG),
             patch.object(api, "service", service),
             self.assertRaisesRegex(RuntimeError, "service failed to start"),
         ):
             asyncio.run(self._run_lifespan())
 
-        self.assertTrue(FakeLocalSearXNG.instances[0].closed)
         self.assertTrue(service.closed)
 
     @staticmethod

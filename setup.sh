@@ -22,8 +22,11 @@ echo
 echo "Setup complete. Activate the environment with:"
 echo "  source .venv/bin/activate"
 echo
-echo "Run the complete stack with Docker Compose:"
-echo "  docker compose up --build"
+echo "Start SearXNG in Docker:"
+echo "  docker compose up -d"
 echo
-echo "Or run a one-off query (Docker is used for temporary SearXNG):"
-echo "  .venv/bin/ezwebsearch \"your query\""
+echo "Start ezWebSearch on port 6666:"
+echo "  .venv/bin/ezwebsearch-api"
+echo
+echo "Or run a one-off query while SearXNG is running:"
+echo "  .venv/bin/ezwebsearch \"your query\" --searxng-url http://127.0.0.1:6667"

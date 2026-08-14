@@ -12,10 +12,10 @@ pages, not just search-result snippets.
 
 - Use `ezwebsearch` (or `python cli.py` from a source checkout) for a one-off
   query and JSON output.
-- Use `--searxng-url` or `SEARXNG_URL` when a SearXNG instance already exists.
-- Allow the CLI to provision its temporary local SearXNG instance
-  automatically. It uses the installed SearXNG module when available and the
-  official Docker image otherwise.
+- Use `--searxng-url` or `SEARXNG_URL` to select a SearXNG instance. The default
+  is the official Docker Compose instance at `http://127.0.0.1:6667`.
+- Start SearXNG separately with `docker compose up -d`; ezWebSearch never
+  provisions or stops SearXNG itself.
 - Use `ezwebsearch-api` (or `python api.py` from a source checkout) or Uvicorn
   when multiple queries need a persistent HTTP service.
 
@@ -66,14 +66,11 @@ Start the service with:
 ezwebsearch-api
 ```
 
-For a new machine, `docker compose up --build` starts the API and a configured
-SearXNG service together. For a native install, run `./setup.sh` first.
+For a new machine, run `./setup.sh`, then `docker compose up -d` and
+`.venv/bin/ezwebsearch-api`. The API listens on port `6666` and SearXNG on
+port `6667`.
 
-When `SEARXNG_URL` is unset, API mode provisions a local SearXNG instance,
-waits for it to become ready, and stops it when the API shuts down. The
-automatic backend uses the installed SearXNG web app when available and the
-official Docker image otherwise. Set `SEARXNG_URL` to use an externally
-managed SearXNG instance.
+Set `SEARXNG_URL` to use an externally managed SearXNG instance.
 
 Call `GET /search` with `query`, `links`, and `retries`. Use `GET /health` for
 a readiness check and `/docs` for the interactive API schema.

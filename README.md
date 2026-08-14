@@ -16,27 +16,39 @@ Playwright with headless Chromium when JavaScript rendering is required.
 - Use the command line interface for one-off searches or FastAPI for a service.
 - Block private and local result URLs by default to reduce SSRF risk.
 
-## Quick start with Docker
+## Quick start
 
-Docker Compose is the easiest setup on a new machine. It starts both the
-ezWebSearch API and a private SearXNG instance; no Python installation or
-browser setup is required on the host.
+SearXNG runs in the official prebuilt Docker image. ezWebSearch runs directly
+on the host so its Playwright browser and Python dependencies are easy to
+manage independently.
 
 ```bash
 git clone <repository-url> ezWebSearch
 cd ezWebSearch
-docker compose up --build
+./setup.sh
+docker compose up -d
+source .venv/bin/activate
+ezwebsearch-api
 ```
+
+To stop SearXNG, run:
+
+```bash
+./cleanup-docker.sh
+```
+
+The cleanup script only removes this project's Compose containers and
+volumes.
 
 Then search from another terminal:
 
 ```bash
-curl "http://127.0.0.1:3000/search?query=best%20local%20LLMs&links=5&retries=3"
+curl "http://127.0.0.1:6666/search?query=best%20local%20LLMs&links=5&retries=3"
 ```
 
-The API is available at `http://127.0.0.1:3000`; interactive documentation is
-at `http://127.0.0.1:3000/docs`. The SearXNG container is not published to the
-host by default.
+The ezWebSearch API is available at `http://127.0.0.1:6666`; interactive
+documentation is at `http://127.0.0.1:6666/docs`. SearXNG is published at
+`http://127.0.0.1:6667`.
 
 ## How it works
 
@@ -48,9 +60,9 @@ SearXNG -> HTTPX -> Trafilatura -> JSON
 
 ## Requirements and installation
 
-- Python 3.10+
-- Docker for the automatic local SearXNG backend, unless an external SearXNG
-  URL is configured
+- Python 3.10+ for ezWebSearch
+- Docker for the local SearXNG container, unless an external SearXNG URL is
+  configured
 
 For a native Python installation, the repository includes a bootstrap script:
 
@@ -67,8 +79,8 @@ On Linux servers where Playwright OS packages are missing, install them with:
 python -m playwright install --with-deps chromium
 ```
 
-The native setup can use an existing SearXNG instance by copying the template
-and setting `SEARXNG_URL`:
+The native setup uses the Compose SearXNG instance by default. To use another
+instance, copy the template and set `SEARXNG_URL`:
 
 ```bash
 cp env.example .env
@@ -76,10 +88,8 @@ ${EDITOR:-vi} .env
 ezwebsearch-api
 ```
 
-If `SEARXNG_URL` is left unset, CLI and API modes provision a temporary local
-instance automatically. The default backend uses the installed SearXNG Python
-module when present and Docker otherwise. Set `SEARXNG_BACKEND=docker` or
-`SEARXNG_BACKEND=python` to choose explicitly.
+The host API listens on port `6666` and the Compose SearXNG container listens
+on port `6667`.
 
 ## Python client library
 
@@ -96,7 +106,7 @@ Use the synchronous client with a running API server:
 ```python
 from ezwebsearch import EzWebSearchClient
 
-with EzWebSearchClient("http://127.0.0.1:3000") as client:
+with EzWebSearchClient() as client:
     response = client.search("best local LLMs", links=5, retries=2)
 
 for page in response["results"]:
@@ -109,7 +119,7 @@ An asynchronous client is available for async applications:
 ```python
 from ezwebsearch import AsyncEzWebSearchClient
 
-async with AsyncEzWebSearchClient("http://127.0.0.1:3000") as client:
+async with AsyncEzWebSearchClient() as client:
     response = await client.search("best local LLMs")
 ```
 
@@ -137,12 +147,11 @@ search:
 The same configuration is available in
 [`searxng-settings-snippet.yml`](searxng-settings-snippet.yml).
 
-Copy the environment template when configuring an external instance or the
-local server:
+Copy the environment template when configuring the host API:
 
 ```bash
 cp env.example .env
-# Set this only when SearXNG is managed separately, for example:
+# Change this only when SearXNG is managed separately:
 # SEARXNG_URL=http://127.0.0.1:8080
 ```
 
@@ -151,9 +160,8 @@ precedence.
 
 ## CLI usage
 
-Run a single search. If no SearXNG URL is supplied, ezWebSearch provisions a
-temporary local SearXNG server, waits for it to become ready, and shuts it down
-when the query finishes.
+Run a single search while SearXNG is running. The default URL is the Compose
+instance at `http://127.0.0.1:6667`.
 
 ```bash
 ezwebsearch "best local LLMs" --links 5 --retries 3
@@ -166,7 +174,7 @@ ezwebsearch \
   --query "best local LLMs" \
   --links 5 \
   --retries 3 \
-  --searxng-url http://127.0.0.1:8080
+  --searxng-url http://127.0.0.1:6667
 ```
 
 Save the returned JSON:
@@ -198,18 +206,18 @@ ezwebsearch-api
 Or use Uvicorn directly:
 
 ```bash
-uvicorn api:app --host 0.0.0.0 --port 3000
+uvicorn api:app --host 0.0.0.0 --port 6666
 ```
 
 Search and check health:
 
 ```bash
-curl "http://127.0.0.1:3000/search?query=best%20local%20LLMs&links=5&retries=3"
-curl http://127.0.0.1:3000/health
+curl "http://127.0.0.1:6666/search?query=best%20local%20LLMs&links=5&retries=3"
+curl http://127.0.0.1:6666/health
 ```
 
 Interactive FastAPI documentation is available at
-`http://127.0.0.1:3000/docs`.
+`http://127.0.0.1:6666/docs`.
 
 ## Parameters
 

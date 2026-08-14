@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 import httpx
 
 
-DEFAULT_BASE_URL = "http://127.0.0.1:3000"
+DEFAULT_BASE_URL = "http://127.0.0.1:6666"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 USER_AGENT = "ezwebsearch-python/0.1.0"
 

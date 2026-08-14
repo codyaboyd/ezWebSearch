@@ -5,8 +5,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 
 from config import Settings
-from local_searxng import LocalSearXNG
-from runtime import SearchRuntime
 from search_service import SearchService
 
 
@@ -20,13 +18,11 @@ async def lifespan(app: FastAPI):
     # environment variables after importing this module behave predictably.
     service.settings.searxng_url = configured.searxng_url
 
-    runtime = SearchRuntime(
-        configured,
-        service=service,
-        local_searxng_factory=LocalSearXNG,
-    )
-    async with runtime:
+    try:
+        await service.start()
         yield
+    finally:
+        await service.close()
 
 
 app = FastAPI(
