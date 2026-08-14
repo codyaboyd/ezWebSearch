@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
-import os
 import re
 import socket
-from dataclasses import dataclass
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 from playwright.async_api import Browser, Playwright, async_playwright
 from trafilatura import bare_extraction
+
+from config import Settings
 
 
 TRACKING_PARAMETERS = {
@@ -24,30 +24,9 @@ TRACKING_PARAMETERS = {
 }
 
 
-def _env_bool(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-@dataclass(slots=True)
-class Settings:
-    searxng_url: str = os.getenv("SEARXNG_URL", "http://127.0.0.1:8080").rstrip("/")
-    http_concurrency: int = int(os.getenv("HTTP_CONCURRENCY", "10"))
-    browser_concurrency: int = int(os.getenv("BROWSER_CONCURRENCY", "3"))
-    page_timeout_seconds: float = float(os.getenv("PAGE_TIMEOUT_SECONDS", "15"))
-    search_timeout_seconds: float = float(os.getenv("SEARCH_TIMEOUT_SECONDS", "10"))
-    browser_timeout_ms: int = int(os.getenv("BROWSER_TIMEOUT_MS", "20000"))
-    browser_settle_ms: int = int(os.getenv("BROWSER_SETTLE_MS", "750"))
-    max_page_bytes: int = int(os.getenv("MAX_PAGE_BYTES", str(5 * 1024 * 1024)))
-    min_text_length: int = int(os.getenv("MIN_TEXT_LENGTH", "300"))
-    allow_private_urls: bool = _env_bool("ALLOW_PRIVATE_URLS", False)
-
-
 class SearchService:
     def __init__(self, settings: Settings | None = None) -> None:
-        self.settings = settings or Settings()
+        self.settings = settings or Settings.from_env()
         self.http: httpx.AsyncClient | None = None
         self.playwright: Playwright | None = None
         self.browser: Browser | None = None
@@ -93,16 +72,28 @@ class SearchService:
 
     async def close(self) -> None:
         if self.browser is not None:
-            await self.browser.close()
-            self.browser = None
+            try:
+                await self.browser.close()
+            except Exception:
+                # The browser transport may already be closed during process
+                # shutdown. Continue closing the remaining resources.
+                pass
+            finally:
+                self.browser = None
 
         if self.playwright is not None:
-            await self.playwright.stop()
-            self.playwright = None
+            try:
+                await self.playwright.stop()
+            except Exception:
+                pass
+            finally:
+                self.playwright = None
 
         if self.http is not None:
-            await self.http.aclose()
-            self.http = None
+            try:
+                await self.http.aclose()
+            finally:
+                self.http = None
 
     async def __aenter__(self) -> "SearchService":
         await self.start()
@@ -197,6 +188,8 @@ class SearchService:
     async def search_searxng(self, query: str, page: int) -> list[dict[str, Any]]:
         if self.http is None:
             raise RuntimeError("Service is not started")
+        if not self.settings.searxng_url:
+            raise RuntimeError("SearXNG URL is not configured")
 
         response = await self.http.get(
             f"{self.settings.searxng_url}/search",

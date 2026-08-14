@@ -1,5 +1,2 @@
-fastapi
-uvicorn[standard]
-httpx
-trafilatura
-playwright
+# Canonical server installation. Run from the repository root.
+-e .[server]

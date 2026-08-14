@@ -10,19 +10,21 @@ pages, not just search-result snippets.
 
 ## Choose an entry point
 
-- Use `python cli.py` for a one-off query and JSON output.
+- Use `ezwebsearch` (or `python cli.py` from a source checkout) for a one-off
+  query and JSON output.
 - Use `--searxng-url` or `SEARXNG_URL` when a SearXNG instance already exists.
-- Allow the CLI to start its temporary Docker-backed SearXNG instance only
-  when Docker is available and local startup is acceptable.
-- Use `python api.py` or Uvicorn when multiple queries need a persistent HTTP
-  service.
+- Allow the CLI to provision its temporary local SearXNG instance
+  automatically. It uses the installed SearXNG module when available and the
+  official Docker image otherwise.
+- Use `ezwebsearch-api` (or `python api.py` from a source checkout) or Uvicorn
+  when multiple queries need a persistent HTTP service.
 
 ## Run a query
 
 From the repository root, run:
 
 ```bash
-python cli.py "your query" --links 5 --retries 2 --searxng-url "$SEARXNG_URL"
+ezwebsearch "your query" --links 5 --retries 2 --searxng-url "$SEARXNG_URL"
 ```
 
 Use `--output result.json` when another step needs a durable artifact. Set
@@ -61,8 +63,17 @@ allows search pages 1 through 3.
 Start the service with:
 
 ```bash
-python api.py
+ezwebsearch-api
 ```
+
+For a new machine, `docker compose up --build` starts the API and a configured
+SearXNG service together. For a native install, run `./setup.sh` first.
+
+When `SEARXNG_URL` is unset, API mode provisions a local SearXNG instance,
+waits for it to become ready, and stops it when the API shuts down. The
+automatic backend uses the installed SearXNG web app when available and the
+official Docker image otherwise. Set `SEARXNG_URL` to use an externally
+managed SearXNG instance.
 
 Call `GET /search` with `query`, `links`, and `retries`. Use `GET /health` for
 a readiness check and `/docs` for the interactive API schema.
@@ -74,5 +85,5 @@ When modifying this skill or the service, keep product-facing names as
 Run the repository test suite after changes:
 
 ```bash
-python -m unittest discover -v
+python3 -m unittest discover -v
 ```

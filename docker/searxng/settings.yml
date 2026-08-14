@@ -1,0 +1,17 @@
+use_default_settings: true
+
+general:
+  instance_name: "SearXNG for ezWebSearch"
+
+search:
+  formats:
+    - html
+    - json
+
+server:
+  # This container is reachable only by the ezWebSearch service. Replace the
+  # value before exposing SearXNG directly to an untrusted network.
+  secret_key: "ezwebsearch-local-development-secret-change-me"
+  bind_address: "0.0.0.0"
+  port: 8080
+  limiter: false

@@ -1,23 +1,32 @@
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
 
+from config import Settings
+from local_searxng import LocalSearXNG
+from runtime import SearchRuntime
 from search_service import SearchService
 
 
-service = SearchService()
+service = SearchService(Settings.from_env())
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await service.start()
-    try:
+    configured = Settings.from_env()
+    # Refresh the URL at lifespan time so process managers and tests that set
+    # environment variables after importing this module behave predictably.
+    service.settings.searxng_url = configured.searxng_url
+
+    runtime = SearchRuntime(
+        configured,
+        service=service,
+        local_searxng_factory=LocalSearXNG,
+    )
+    async with runtime:
         yield
-    finally:
-        await service.close()
 
 
 app = FastAPI(
@@ -62,12 +71,16 @@ async def search(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-if __name__ == "__main__":
+def main() -> None:
     import uvicorn
 
     uvicorn.run(
         "api:app",
-        host=os.getenv("HOST", "0.0.0.0"),
-        port=int(os.getenv("PORT", "3000")),
+        host=Settings.from_env().host,
+        port=Settings.from_env().port,
         reload=False,
     )
+
+
+if __name__ == "__main__":
+    main()

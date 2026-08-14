@@ -3,12 +3,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import os
 import sys
 from pathlib import Path
 
+from config import Settings
 from local_searxng import LocalSearXNG
-from search_service import SearchService, Settings
+from runtime import SearchRuntime
+from search_service import SearchService
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -50,10 +51,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--searxng-url",
-        default=os.getenv("SEARXNG_URL"),
+        default=Settings.from_env().searxng_url,
         help=(
-            "SearXNG base URL. If omitted, start a temporary local SearXNG "
-            "container (or use SEARXNG_URL)."
+            "SearXNG base URL. If omitted, provision a temporary local "
+            "SearXNG server automatically (or use SEARXNG_URL)."
         ),
     )
     parser.add_argument(
@@ -77,17 +78,18 @@ async def run(args: argparse.Namespace) -> int:
         print("error: a query is required", file=sys.stderr)
         return 2
 
-    local_searxng: LocalSearXNG | None = None
-
     try:
-        searxng_url = getattr(args, "searxng_url", None)
-        if not searxng_url:
-            local_searxng = LocalSearXNG()
-            searxng_url = await local_searxng.start()
+        settings = Settings.from_env()
+        if getattr(args, "searxng_url", None):
+            settings.searxng_url = args.searxng_url
 
-        settings = Settings(searxng_url=searxng_url.rstrip("/"))
-        async with SearchService(settings) as service:
-            result = await service.search(
+        runtime = SearchRuntime(
+            settings,
+            service=SearchService(settings),
+            local_searxng_factory=LocalSearXNG,
+        )
+        async with runtime:
+            result = await runtime.service.search(
                 query=query,
                 links=args.links,
                 retries=args.retries,
@@ -95,9 +97,6 @@ async def run(args: argparse.Namespace) -> int:
     except Exception as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    finally:
-        if local_searxng is not None:
-            await local_searxng.close()
 
     if args.compact:
         rendered = json.dumps(result, ensure_ascii=False, separators=(",", ":"))

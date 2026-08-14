@@ -16,6 +16,28 @@ Playwright with headless Chromium when JavaScript rendering is required.
 - Use the command line interface for one-off searches or FastAPI for a service.
 - Block private and local result URLs by default to reduce SSRF risk.
 
+## Quick start with Docker
+
+Docker Compose is the easiest setup on a new machine. It starts both the
+ezWebSearch API and a private SearXNG instance; no Python installation or
+browser setup is required on the host.
+
+```bash
+git clone <repository-url> ezWebSearch
+cd ezWebSearch
+docker compose up --build
+```
+
+Then search from another terminal:
+
+```bash
+curl "http://127.0.0.1:3000/search?query=best%20local%20LLMs&links=5&retries=3"
+```
+
+The API is available at `http://127.0.0.1:3000`; interactive documentation is
+at `http://127.0.0.1:3000/docs`. The SearXNG container is not published to the
+host by default.
+
 ## How it works
 
 ```text
@@ -24,31 +46,40 @@ SearXNG -> HTTPX -> Trafilatura -> JSON
                        +-> Playwright + Chromium -> Trafilatura -> JSON
 ```
 
-## Requirements
+## Requirements and installation
 
 - Python 3.10+
-- A running SearXNG instance with JSON output enabled for API mode
-- Docker for CLI mode when `--searxng-url` is omitted
-- Chromium installed through Playwright
+- Docker for the automatic local SearXNG backend, unless an external SearXNG
+  URL is configured
 
-The application code is entirely Python. Playwright controls a Chromium
-browser binary only for sites that need browser rendering.
-
-## Install
+For a native Python installation, the repository includes a bootstrap script:
 
 ```bash
-python3 -m venv .venv
+./setup.sh
 source .venv/bin/activate
-
-pip install -r requirements.txt
-python -m playwright install chromium
 ```
 
-On some Linux servers, install Chromium and its OS dependencies with:
+This installs the server dependencies, the Chromium browser used for
+JavaScript-heavy pages, and the `ezwebsearch` / `ezwebsearch-api` commands.
+On Linux servers where Playwright OS packages are missing, install them with:
 
 ```bash
 python -m playwright install --with-deps chromium
 ```
+
+The native setup can use an existing SearXNG instance by copying the template
+and setting `SEARXNG_URL`:
+
+```bash
+cp env.example .env
+${EDITOR:-vi} .env
+ezwebsearch-api
+```
+
+If `SEARXNG_URL` is left unset, CLI and API modes provision a temporary local
+instance automatically. The default backend uses the installed SearXNG Python
+module when present and Docker otherwise. Set `SEARXNG_BACKEND=docker` or
+`SEARXNG_BACKEND=python` to choose explicitly.
 
 ## Python client library
 
@@ -93,7 +124,8 @@ pip install ".[server]"
 
 ## Configure SearXNG
 
-Enable JSON output in your SearXNG `settings.yml`:
+Docker Compose already supplies a SearXNG configuration with JSON output
+enabled. For an externally managed instance, add JSON to its `settings.yml`:
 
 ```yaml
 search:
@@ -105,31 +137,32 @@ search:
 The same configuration is available in
 [`searxng-settings-snippet.yml`](searxng-settings-snippet.yml).
 
-Copy the environment template when configuring a local instance:
+Copy the environment template when configuring an external instance or the
+local server:
 
 ```bash
-cp .env.example .env
-export SEARXNG_URL="http://127.0.0.1:8080"
+cp env.example .env
+# Set this only when SearXNG is managed separately, for example:
+# SEARXNG_URL=http://127.0.0.1:8080
 ```
 
-ezWebSearch does not require `python-dotenv`; export values normally or set
-them in your process manager.
+The application loads `.env` automatically. Process environment variables take
+precedence.
 
 ## CLI usage
 
-Run a single search. If no SearXNG URL is supplied, ezWebSearch starts a
-temporary local SearXNG container, waits for it to become ready, and removes it
-when the query finishes. The first run may download the SearXNG container
-image.
+Run a single search. If no SearXNG URL is supplied, ezWebSearch provisions a
+temporary local SearXNG server, waits for it to become ready, and shuts it down
+when the query finishes.
 
 ```bash
-python cli.py "best local LLMs" --links 5 --retries 3
+ezwebsearch "best local LLMs" --links 5 --retries 3
 ```
 
 Use an existing SearXNG instance instead:
 
 ```bash
-python cli.py \
+ezwebsearch \
   --query "best local LLMs" \
   --links 5 \
   --retries 3 \
@@ -139,7 +172,7 @@ python cli.py \
 Save the returned JSON:
 
 ```bash
-python cli.py \
+ezwebsearch \
   "best local LLMs" \
   --links 5 \
   --retries 3 \
@@ -156,10 +189,10 @@ CLI exit codes:
 
 ## API usage
 
-Start FastAPI:
+Start the API:
 
 ```bash
-python api.py
+ezwebsearch-api
 ```
 
 Or use Uvicorn directly:
@@ -253,7 +286,7 @@ implications.
 Run the test suite with:
 
 ```bash
-python -m unittest discover -v
+python3 -m unittest discover -v
 ```
 
 The project also includes [`SKILL.md`](SKILL.md), which documents how an AI
